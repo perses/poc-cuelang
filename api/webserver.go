@@ -3,101 +3,77 @@ package api
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
-	"cuelang.org/go/cue/errors"
+	"cuelang.org/go/cue/load"
 	"github.com/labstack/echo/v4"
 	utilsEcho "github.com/perses/common/echo"
-	persesModel "github.com/perses/perses/pkg/model/api/v1"
 )
 
 const (
-	schemaName = "datasourceSchema"
-	schemaDef  = "#" + schemaName + `: {
-		kind: "Datasource"
-		metadata: {
-			name: string
-		}
-		spec: {
-			kind: string | *"Prometheus"
-			default: bool
-			http: {
-				url: string
-			}
-		}
-	}
-	`
+	cueFile = "dev/schemas/line.cue"
 )
 
 type ServerAPI struct {
 	utilsEcho.Register
-	ctx    *cue.Context
-	schema cue.Value
+	ctx     *cue.Context
+	schemas []cue.Value
 }
 
 func NewServerAPI() *ServerAPI {
 	// create a Context
 	ctx := cuecontext.New()
-	// compile our schema
-	schema := ctx.CompileString(schemaDef)
+	// Retrieve our schemas.
+	entrypoints := []string{cueFile}
+	// - Load Cue files into Cue build.Instances slice (the second arg is a configuration object, not used atm)
+	buildInstances := load.Instances(entrypoints, nil)
+	// - build Values from the Instances
+	schemas, err := ctx.BuildInstances(buildInstances)
+	// check for errors on the instances, these are typically parsing errors
+	if err != nil {
+		log.Fatalf("Error retrieving schemas : %v\n", err)
+	}
 
 	return &ServerAPI{
-		ctx:    ctx,
-		schema: schema,
+		ctx:     ctx,
+		schemas: schemas,
 	}
 }
 
 func (s *ServerAPI) RegisterRoute(e *echo.Echo) {
 	e.POST("/validate", func(c echo.Context) error {
+		var res error
 		data, err := ioutil.ReadAll(c.Request().Body)
 
 		fmt.Println("User input :")
 		fmt.Println(string(data))
 
-		// build the final CUE payload as a combination of user input & schema constraint
-		cueData := fmt.Sprintf("#%s & %s", schemaName, data)
+		// compile the CUE data into a Value
+		v := s.ctx.CompileBytes(data)
 
-		// compile the CUE data into a Value, with scope
-		v := s.ctx.CompileString(cueData, cue.Scope(s.schema))
+		// iterate over schemas until we find a matching one for our value
+		for _, schema := range s.schemas {
+			fmt.Printf("Current schema : %v\n", schema)
 
-		// check for errors during compiling
-		if v.Err() != nil {
-			msg := errors.Details(v.Err(), nil)
-			fmt.Printf("Compile Error:\n%s\n", msg)
-		} else {
-			fmt.Println("CUE compilation result :")
-			fmt.Println(v)
+			unified := v.Unify(schema)
+			opts := []cue.Option{
+				cue.Attributes(true),
+				cue.Definitions(true),
+				cue.Hidden(true),
+			}
+
+			err = unified.Validate(opts...)
+			if err != nil {
+				fmt.Printf("Validation Error: %s\n", err)
+				res = err
+			} else {
+				fmt.Println("This panel definition is valid !")
+			}
 		}
 
-		// evaluate the CUE Value
-		e := v.Eval()
-		if e.Err() != nil {
-			msg := errors.Details(e.Err(), nil)
-			fmt.Printf("Eval Error:\n%s\n", msg)
-		} else {
-			fmt.Println("CUE evaluation result :")
-			fmt.Printf("%#v\n", e)
-		}
-
-		// check if the CUE Value is concrete
-		if v.IsConcrete() {
-			fmt.Println("CUE Value is concrete")
-		} else {
-			fmt.Println("CUE Value is not concrete")
-		}
-
-		// decode the CUE Value into Go struct
-		var datasource persesModel.Datasource
-		decodeErr := v.Decode(&datasource)
-		if decodeErr != nil {
-			fmt.Printf("Decode Error:\n%s\n", decodeErr)
-		} else {
-			fmt.Println("CUE Value successfully decoded into a Datasource object :")
-			fmt.Println(datasource)
-		}
-
-		return err
+		return res
 	})
 }
 
