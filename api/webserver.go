@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -13,7 +14,7 @@ import (
 )
 
 const (
-	cueFile = "dev/schemas/line.cue"
+	schemasPath = "dev/schemas/"
 )
 
 type ServerAPI struct {
@@ -25,15 +26,19 @@ type ServerAPI struct {
 func NewServerAPI() *ServerAPI {
 	// create a Context
 	ctx := cuecontext.New()
-	// Retrieve our schemas.
-	entrypoints := []string{cueFile}
-	// - Load Cue files into Cue build.Instances slice (the second arg is a configuration object, not used atm)
-	buildInstances := load.Instances(entrypoints, nil)
-	// - build Values from the Instances
-	schemas, err := ctx.BuildInstances(buildInstances)
-	// check for errors on the instances, these are typically parsing errors
+
+	// retrieve the list of schema files
+	files, err := ioutil.ReadDir(schemasPath)
 	if err != nil {
-		log.Fatalf("Error retrieving schemas : %v\n", err)
+		log.Fatal(err)
+	}
+
+	schemas := make([]cue.Value, 0)
+	for _, file := range files {
+		// Load Cue file into Cue build.Instances slice (the second arg is a configuration object, not used atm)
+		buildInstance := load.Instances([]string{schemasPath + file.Name()}, nil)[0]
+		// build Value from the Instance
+		schemas = append(schemas, ctx.BuildInstance(buildInstance))
 	}
 
 	return &ServerAPI{
@@ -44,7 +49,6 @@ func NewServerAPI() *ServerAPI {
 
 func (s *ServerAPI) RegisterRoute(e *echo.Echo) {
 	e.POST("/validate", func(c echo.Context) error {
-		var res error
 		data, err := ioutil.ReadAll(c.Request().Body)
 
 		fmt.Println("User input :")
@@ -54,6 +58,7 @@ func (s *ServerAPI) RegisterRoute(e *echo.Echo) {
 		v := s.ctx.CompileBytes(data)
 
 		// iterate over schemas until we find a matching one for our value
+		res := errors.New("this input didn't match any known schemas")
 		for _, schema := range s.schemas {
 			fmt.Printf("Current schema : %v\n", schema)
 
@@ -67,9 +72,10 @@ func (s *ServerAPI) RegisterRoute(e *echo.Echo) {
 			err = unified.Validate(opts...)
 			if err != nil {
 				fmt.Printf("Validation Error: %s\n", err)
-				res = err
 			} else {
 				fmt.Println("This panel definition is valid !")
+				res = nil
+				break
 			}
 		}
 
