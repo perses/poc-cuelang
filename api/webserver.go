@@ -2,9 +2,9 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
-	"log"
+
+	"github.com/sirupsen/logrus"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
@@ -28,7 +28,7 @@ func NewServerAPI(c *config.Config) *ServerAPI {
 	// retrieve the list of schema files
 	files, err := ioutil.ReadDir(c.SchemasPath)
 	if err != nil {
-		log.Fatal(err)
+		logrus.WithError(err).Fatal("not able to retrieve the list of schema files")
 	}
 
 	schemas := make([]cue.Value, 0)
@@ -51,27 +51,23 @@ func (s *ServerAPI) RegisterRoute(e *echo.Echo) {
 		dashboard := new(model.Dashboard)
 		err := c.Bind(dashboard)
 		if err != nil {
-			fmt.Printf("Failed unmarshalling the received payload: %s\n", err)
+			logrus.WithError(err).Error("Failed unmarshalling the received payload")
 			return err
 		}
-		fmt.Println("Dashboard to validate :")
-		fmt.Printf("%+v\n", dashboard)
+		logrus.Tracef("Dashboard to validate : %+v", dashboard)
 
 		var res error
 		for _, panel := range dashboard.Spec.Panels {
-			fmt.Println("Panel to validate :")
-			fmt.Printf("%+v\n", panel)
-
 			// remarshal the panel to be processed by CUE
 			panelJson, _ := json.Marshal(panel)
-			fmt.Printf("After remarshal : %s\n", string(panelJson))
+			logrus.Tracef("Panel to validate : %s", string(panelJson))
 
 			// compile the JSON panel into a CUE Value
 			v := s.ctx.CompileBytes(panelJson)
 
 			// iterate over schemas until we find a matching one for our value
 			for _, schema := range s.schemas {
-				fmt.Printf("Current schema : %v\n", schema)
+				logrus.Tracef("Matching panel against schema : %+v", schema)
 
 				unified := v.Unify(schema)
 				opts := []cue.Option{
@@ -82,10 +78,10 @@ func (s *ServerAPI) RegisterRoute(e *echo.Echo) {
 
 				err = unified.Validate(opts...)
 				if err != nil {
-					fmt.Printf("Validation Error: %s\n", err)
+					// Validation error, but maybe the next schema will work
 					res = err
 				} else {
-					fmt.Println("This panel definition is valid !")
+					logrus.Debug("This panel is valid (found matching schema)")
 					res = nil
 					break
 				}
@@ -93,14 +89,15 @@ func (s *ServerAPI) RegisterRoute(e *echo.Echo) {
 
 			// an invalid panel was found, stop the processing here
 			if res != nil {
+				logrus.WithError(err).Error("This panel is invalid, no schema corresponds")
 				break
 			}
 		}
 
 		if res == nil {
-			fmt.Println("This dashboard is valid !")
+			logrus.Info("This dashboard is valid (all its panels are valid")
 		} else {
-			fmt.Printf("This dashboard is not valid, at least 1 of its panels is invalid: %s\n", err)
+			logrus.WithError(err).Error("This dashboard is invalid (at least 1 panel is invalid)")
 		}
 
 		return res
