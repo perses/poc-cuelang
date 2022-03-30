@@ -71,6 +71,7 @@ func (s *ServerAPI) RegisterRoute(e *echo.Echo) {
 
 				unified := v.Unify(schema)
 				opts := []cue.Option{
+					cue.Concrete(true),
 					cue.Attributes(true),
 					cue.Definitions(true),
 					cue.Hidden(true),
