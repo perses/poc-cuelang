@@ -1,7 +1,7 @@
 package api
 
 import (
-	"errors"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -11,6 +11,7 @@ import (
 	"cuelang.org/go/cue/load"
 	"github.com/labstack/echo/v4"
 	utilsEcho "github.com/perses/common/echo"
+	model "github.com/perses/poc-cuelang/model"
 )
 
 const (
@@ -49,34 +50,60 @@ func NewServerAPI() *ServerAPI {
 
 func (s *ServerAPI) RegisterRoute(e *echo.Echo) {
 	e.POST("/validate", func(c echo.Context) error {
-		data, err := ioutil.ReadAll(c.Request().Body)
+		// deserialize input into a Dashboard struct
+		dashboard := new(model.Dashboard)
+		err := c.Bind(dashboard)
+		if err != nil {
+			fmt.Printf("Failed unmarshalling the received payload: %s\n", err)
+			return err
+		}
+		fmt.Println("Dashboard to validate :")
+		fmt.Printf("%+v\n", dashboard)
 
-		fmt.Println("User input :")
-		fmt.Println(string(data))
+		var res error
+		for _, panel := range dashboard.Spec.Panels {
+			fmt.Println("Panel to validate :")
+			fmt.Printf("%+v\n", panel)
 
-		// compile the CUE data into a Value
-		v := s.ctx.CompileBytes(data)
+			// remarshal the panel to be processed by CUE
+			panelJson, _ := json.Marshal(panel)
+			fmt.Printf("After remarshal : %s\n", string(panelJson))
 
-		// iterate over schemas until we find a matching one for our value
-		res := errors.New("this input didn't match any known schemas")
-		for _, schema := range s.schemas {
-			fmt.Printf("Current schema : %v\n", schema)
+			// compile the JSON panel into a CUE Value
+			v := s.ctx.CompileBytes(panelJson)
 
-			unified := v.Unify(schema)
-			opts := []cue.Option{
-				cue.Attributes(true),
-				cue.Definitions(true),
-				cue.Hidden(true),
+			// iterate over schemas until we find a matching one for our value
+			for _, schema := range s.schemas {
+				fmt.Printf("Current schema : %v\n", schema)
+
+				unified := v.Unify(schema)
+				opts := []cue.Option{
+					cue.Attributes(true),
+					cue.Definitions(true),
+					cue.Hidden(true),
+				}
+
+				err = unified.Validate(opts...)
+				if err != nil {
+					fmt.Printf("Validation Error: %s\n", err)
+					res = err
+				} else {
+					fmt.Println("This panel definition is valid !")
+					res = nil
+					break
+				}
 			}
 
-			err = unified.Validate(opts...)
-			if err != nil {
-				fmt.Printf("Validation Error: %s\n", err)
-			} else {
-				fmt.Println("This panel definition is valid !")
-				res = nil
+			// an invalid panel was found, stop the processing here
+			if res != nil {
 				break
 			}
+		}
+
+		if res == nil {
+			fmt.Println("This dashboard is valid !")
+		} else {
+			fmt.Printf("This dashboard is not valid, at least 1 of its panels is invalid: %s\n", err)
 		}
 
 		return res

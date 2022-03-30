@@ -1,0 +1,63 @@
+{
+  "kind": "Dashboard",
+  "metadata": {
+    "name": "SimpleDashboard",
+    "created_at": "0001-01-01T00:00:00Z",
+    "updated_at": "0001-01-01T00:00:00Z",
+    "project": "perses"
+  },
+  "spec": {
+    "datasource": {
+      "name": "PrometheusDemo",
+      "kind": "Prometheus",
+      "global": false
+    },
+    "duration": "6h",
+    "panels": {
+      "My1rstPanel": {
+        "displayed_name": "simple line chart",
+        "kind": "LineChart",
+        "chart": {
+          "show_legend": false,
+          "lines": [
+            {
+              "expr": "up"
+            }
+          ]
+        }
+      },
+      "My2ndPanel": {
+        "displayed_name": "simple gauge chart",
+        "kind": "GaugeChart",
+        "chart": {
+          "expr": "up"
+        }
+      },
+      "MyWeirdPanel": {
+        "displayed_name": "simple weird chart",
+        "kind": "WeirdChart",
+        "chart": {
+          "expr": "up",
+          "weird": true
+        },
+        "weird": "still true"
+      }
+    },
+    "layouts": {
+      "main": {
+        "kind": "Expand",
+        "parameter": {
+          "open": false,
+          "children": [
+            {
+              "$ref": "#/spec/panels/MyPanel"
+            }
+          ]
+        }
+      }
+    },
+    "entrypoint": {
+      "$ref": "#/spec/layouts/main"
+    }
+  }
+}
