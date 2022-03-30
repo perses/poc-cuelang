@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/sirupsen/logrus"
 
 	"cuelang.org/go/cue"
@@ -39,6 +40,8 @@ func NewServerAPI(c *config.Config) *ServerAPI {
 		schemas = append(schemas, ctx.BuildInstance(buildInstance))
 	}
 
+	go watchSchemas(c.SchemasPath)
+
 	return &ServerAPI{
 		ctx:     ctx,
 		schemas: schemas,
@@ -54,20 +57,20 @@ func (s *ServerAPI) RegisterRoute(e *echo.Echo) {
 			logrus.WithError(err).Error("Failed unmarshalling the received payload")
 			return err
 		}
-		logrus.Tracef("Dashboard to validate : %+v", dashboard)
+		logrus.Tracef("Dashboard to validate: %+v", dashboard)
 
 		var res error
 		for _, panel := range dashboard.Spec.Panels {
 			// remarshal the panel to be processed by CUE
 			panelJson, _ := json.Marshal(panel)
-			logrus.Tracef("Panel to validate : %s", string(panelJson))
+			logrus.Tracef("Panel to validate: %s", string(panelJson))
 
 			// compile the JSON panel into a CUE Value
 			v := s.ctx.CompileBytes(panelJson)
 
 			// iterate over schemas until we find a matching one for our value
 			for _, schema := range s.schemas {
-				logrus.Tracef("Matching panel against schema : %+v", schema)
+				logrus.Tracef("Matching panel against schema: %+v", schema)
 
 				unified := v.Unify(schema)
 				opts := []cue.Option{
@@ -107,4 +110,46 @@ func (s *ServerAPI) RegisterRoute(e *echo.Echo) {
 
 func (s *ServerAPI) Close() error {
 	return nil
+}
+
+// watch schemas for changes
+// TODO useless watch for now, just prints events.
+func watchSchemas(filepath string) {
+	logrus.Debugf("Start watching file: %s", filepath)
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	defer watcher.Close()
+
+	done := make(chan bool)
+	go func() {
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				if event.Op&fsnotify.Create == fsnotify.Create {
+					logrus.Tracef("%s created", event.Name)
+				} else if event.Op&fsnotify.Write == fsnotify.Write {
+					logrus.Tracef("%s modified", event.Name)
+				} else if event.Op&fsnotify.Remove == fsnotify.Remove || event.Op&fsnotify.Rename == fsnotify.Rename {
+					logrus.Tracef("%s moved or deleted", event.Name)
+				}
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				logrus.WithError(err).Trace("watcher error")
+			}
+		}
+	}()
+
+	err = watcher.Add(filepath)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	<-done
 }
