@@ -11,11 +11,8 @@ import (
 	"cuelang.org/go/cue/load"
 	"github.com/labstack/echo/v4"
 	utilsEcho "github.com/perses/common/echo"
-	model "github.com/perses/poc-cuelang/model"
-)
-
-const (
-	schemasPath = "dev/schemas/"
+	config "github.com/perses/poc-cuelang/internal/config"
+	model "github.com/perses/poc-cuelang/internal/model"
 )
 
 type ServerAPI struct {
@@ -24,12 +21,12 @@ type ServerAPI struct {
 	schemas []cue.Value
 }
 
-func NewServerAPI() *ServerAPI {
+func NewServerAPI(c *config.Config) *ServerAPI {
 	// create a Context
 	ctx := cuecontext.New()
 
 	// retrieve the list of schema files
-	files, err := ioutil.ReadDir(schemasPath)
+	files, err := ioutil.ReadDir(c.SchemasPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -37,7 +34,7 @@ func NewServerAPI() *ServerAPI {
 	schemas := make([]cue.Value, 0)
 	for _, file := range files {
 		// Load Cue file into Cue build.Instances slice (the second arg is a configuration object, not used atm)
-		buildInstance := load.Instances([]string{schemasPath + file.Name()}, nil)[0]
+		buildInstance := load.Instances([]string{c.SchemasPath + file.Name()}, nil)[0]
 		// build Value from the Instance
 		schemas = append(schemas, ctx.BuildInstance(buildInstance))
 	}

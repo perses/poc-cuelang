@@ -8,4 +8,5 @@ require (
 	github.com/perses/common v0.10.0
 	github.com/perses/perses v0.0.0-20220323190413-5567c3dc05e1
 	github.com/prometheus/common v0.32.1
+	github.com/sirupsen/logrus v1.8.1
 )

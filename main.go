@@ -14,13 +14,25 @@
 package main
 
 import (
+	"flag"
+
 	"github.com/perses/common/app"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/perses/poc-cuelang/api"
+	"github.com/perses/poc-cuelang/internal/config"
 )
 
 func main() {
-	serverAPI := api.NewServerAPI()
+	configFile := flag.String("config", "", "Path to the yaml configuration file. Configuration can be overridden with environment variables.")
+	flag.Parse()
+
+	conf, err := config.Resolve(*configFile)
+	if err != nil {
+		log.WithError(err).Fatalf("error reading configuration file %q", *configFile)
+	}
+
+	serverAPI := api.NewServerAPI(conf)
 	runner := app.NewRunner().WithDefaultHTTPServer("poc_cuelang")
 	runner.HTTPServerBuilder().APIRegistration(serverAPI)
 	runner.Start()
