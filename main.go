@@ -22,6 +22,7 @@ import (
 	"github.com/perses/poc-cuelang/api"
 	"github.com/perses/poc-cuelang/internal/config"
 	"github.com/perses/poc-cuelang/internal/validator"
+	"github.com/perses/poc-cuelang/internal/watcher"
 )
 
 func main() {
@@ -34,6 +35,10 @@ func main() {
 	}
 
 	validator := validator.New(conf)
+
+	// watch schemas for changes
+	watcher.Start(conf, validator)
+
 	serverAPI := api.NewServerAPI(validator)
 	runner := app.NewRunner().WithDefaultHTTPServer("poc_cuelang")
 	runner.HTTPServerBuilder().APIRegistration(serverAPI)

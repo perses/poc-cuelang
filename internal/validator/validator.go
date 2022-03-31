@@ -11,11 +11,11 @@ import (
 	"github.com/perses/poc-cuelang/internal/config"
 	"github.com/perses/poc-cuelang/internal/model"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/fsnotify.v1"
 )
 
 type Validator interface {
 	Validate(c echo.Context) error
+	LoadSchemas()
 }
 
 type validator struct {
@@ -23,7 +23,7 @@ type validator struct {
 	schemas []cue.Value
 }
 
-func New(c *config.Config) *validator {
+func New(c *config.Config) Validator {
 	// create a Context
 	ctx := cuecontext.New()
 
@@ -40,8 +40,6 @@ func New(c *config.Config) *validator {
 		// build Value from the Instance
 		schemas = append(schemas, ctx.BuildInstance(buildInstance))
 	}
-
-	go watchSchemas(c.SchemasPath)
 
 	return &validator{
 		ctx:     ctx,
@@ -107,45 +105,9 @@ func (v *validator) Validate(c echo.Context) error {
 	return res
 }
 
-// watch schemas for changes
-// TODO useless watch for now, just prints events.
-// TODO to be moved to a dedicated package
-func watchSchemas(filepath string) {
-	logrus.Debugf("Start watching file: %s", filepath)
-
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		logrus.Fatal(err)
-	}
-	defer watcher.Close()
-
-	done := make(chan bool)
-	go func() {
-		for {
-			select {
-			case event, ok := <-watcher.Events:
-				if !ok {
-					return
-				}
-				if event.Op&fsnotify.Create == fsnotify.Create {
-					logrus.Tracef("%s created", event.Name)
-				} else if event.Op&fsnotify.Write == fsnotify.Write {
-					logrus.Tracef("%s modified", event.Name)
-				} else if event.Op&fsnotify.Remove == fsnotify.Remove || event.Op&fsnotify.Rename == fsnotify.Rename {
-					logrus.Tracef("%s moved or deleted", event.Name)
-				}
-			case err, ok := <-watcher.Errors:
-				if !ok {
-					return
-				}
-				logrus.WithError(err).Trace("watcher error")
-			}
-		}
-	}()
-
-	err = watcher.Add(filepath)
-	if err != nil {
-		logrus.Fatal(err)
-	}
-	<-done
+/*
+ * Load schemas from .cue files
+ */
+func (v *validator) LoadSchemas() {
+	logrus.Info("Loading schemas")
 }
