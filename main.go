@@ -21,6 +21,7 @@ import (
 
 	"github.com/perses/poc-cuelang/api"
 	"github.com/perses/poc-cuelang/internal/config"
+	"github.com/perses/poc-cuelang/internal/validator"
 )
 
 func main() {
@@ -32,7 +33,8 @@ func main() {
 		logrus.WithError(err).Fatalf("error reading configuration file %q", *configFile)
 	}
 
-	serverAPI := api.NewServerAPI(conf)
+	validator := validator.New(conf)
+	serverAPI := api.NewServerAPI(validator)
 	runner := app.NewRunner().WithDefaultHTTPServer("poc_cuelang")
 	runner.HTTPServerBuilder().APIRegistration(serverAPI)
 	runner.Start()
