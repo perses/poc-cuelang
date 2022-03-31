@@ -2,11 +2,12 @@ package validator
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
+	"os"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
-	"cuelang.org/go/cue/load"
 	"github.com/labstack/echo/v4"
 	"github.com/perses/poc-cuelang/internal/config"
 	"github.com/perses/poc-cuelang/internal/model"
@@ -23,12 +24,15 @@ type validator struct {
 	schemas []cue.Value
 }
 
+/*
+ * Instanciate a validator
+ */
 func New(c *config.Config) Validator {
 	ctx := cuecontext.New()
 
 	schemas, err := loadSchemas(ctx, c.SchemasPath)
 	if err != nil {
-		logrus.WithError(err).Error("not able to retrieve the list of schema files")
+		logrus.WithError(err).Error("Not able to retrieve the list of schema files")
 	}
 
 	validator := &validator{
@@ -108,7 +112,7 @@ func (v *validator) Validate(c echo.Context) error {
 func (v *validator) LoadSchemas(path string) {
 	schemas, err := loadSchemas(v.context, path)
 	if err != nil {
-		logrus.WithError(err).Error("not able to retrieve the list of schema files")
+		logrus.WithError(err).Error("Not able to retrieve the list of schema files")
 		return
 	}
 
@@ -126,11 +130,14 @@ func loadSchemas(context *cue.Context, path string) ([]cue.Value, error) {
 		return schemas, err
 	}
 
+	// parse each .cue file into a CUE Value
 	for _, file := range files {
-		// Load Cue file into Cue build.Instances slice (the second arg is a configuration object, not used atm)
-		buildInstance := load.Instances([]string{path + file.Name()}, nil)[0]
-		// build Value from the Instance
-		schemas = append(schemas, context.BuildInstance(buildInstance))
+		fullPath := fmt.Sprintf("%s/%s", path, file.Name())
+		data, err := os.ReadFile(fullPath)
+		if err != nil {
+			logrus.WithError(err).Errorf("Not able to read file: %s", file.Name())
+		}
+		schemas = append(schemas, context.CompileBytes(data))
 	}
 
 	return schemas, nil
