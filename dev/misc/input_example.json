@@ -14,7 +14,7 @@
     },
     "duration": "6h",
     "panels": {
-      "My1rstPanel": {
+      "MyLinePanel": {
         "displayed_name": "simple line chart",
         "kind": "LineChart",
         "chart": {
@@ -26,21 +26,24 @@
           ]
         }
       },
-      "My2ndPanel": {
+      "MyGaugePanel": {
         "displayed_name": "simple gauge chart",
         "kind": "GaugeChart",
         "chart": {
           "expr": "up"
         }
       },
-      "MyWeirdPanel": {
-        "displayed_name": "simple weird chart",
-        "kind": "WeirdChart",
+      "MyPiePanel": {
+        "displayed_name": "simple pie chart",
+        "kind": "PieChart",
         "chart": {
-          "expr": "up",
-          "weird": true
-        },
-        "weird": "still true"
+          "queries": [
+            {
+              "expr": "up",
+              "legend": "the up metric"
+            }
+          ]
+        }
       }
     },
     "layouts": {

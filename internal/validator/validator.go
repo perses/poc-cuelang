@@ -24,11 +24,9 @@ type validator struct {
 }
 
 func New(c *config.Config) Validator {
-	// create a Context
 	ctx := cuecontext.New()
 
-	// initial load of schemas
-	schemas, err := parseSchemas(ctx, c.SchemasPath)
+	schemas, err := loadSchemas(ctx, c.SchemasPath)
 	if err != nil {
 		logrus.WithError(err).Error("not able to retrieve the list of schema files")
 	}
@@ -108,9 +106,7 @@ func (v *validator) Validate(c echo.Context) error {
  * Load the known list of schemas into the validator
  */
 func (v *validator) LoadSchemas(path string) {
-	logrus.Info("Loading schemas")
-
-	schemas, err := parseSchemas(v.context, path)
+	schemas, err := loadSchemas(v.context, path)
 	if err != nil {
 		logrus.WithError(err).Error("not able to retrieve the list of schema files")
 		return
@@ -120,9 +116,9 @@ func (v *validator) LoadSchemas(path string) {
 }
 
 /*
- * Retrieve & parse schemas from .cue files
+ * Load & return the known list of schemas
  */
-func parseSchemas(context *cue.Context, path string) ([]cue.Value, error) {
+func loadSchemas(context *cue.Context, path string) ([]cue.Value, error) {
 	schemas := make([]cue.Value, 0)
 
 	files, err := ioutil.ReadDir(path)
