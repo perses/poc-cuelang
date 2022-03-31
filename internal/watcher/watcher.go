@@ -31,7 +31,7 @@ func Start(c *config.Config, v validator.Validator) {
 						return
 					} else {
 						logrus.Tracef("%s event on %s", event.Op, event.Name)
-						v.LoadSchemas()
+						v.LoadSchemas(c.SchemasPath)
 					}
 				case err, ok := <-watcher.Errors:
 					if !ok {

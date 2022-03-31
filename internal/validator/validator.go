@@ -15,11 +15,11 @@ import (
 
 type Validator interface {
 	Validate(c echo.Context) error
-	LoadSchemas()
+	LoadSchemas(path string)
 }
 
 type validator struct {
-	ctx     *cue.Context
+	context *cue.Context
 	schemas []cue.Value
 }
 
@@ -27,26 +27,25 @@ func New(c *config.Config) Validator {
 	// create a Context
 	ctx := cuecontext.New()
 
-	// retrieve the list of schema files
-	files, err := ioutil.ReadDir(c.SchemasPath)
+	// initial load of schemas
+	schemas, err := parseSchemas(ctx, c.SchemasPath)
 	if err != nil {
-		logrus.WithError(err).Fatal("not able to retrieve the list of schema files")
+		logrus.WithError(err).Error("not able to retrieve the list of schema files")
 	}
 
-	schemas := make([]cue.Value, 0)
-	for _, file := range files {
-		// Load Cue file into Cue build.Instances slice (the second arg is a configuration object, not used atm)
-		buildInstance := load.Instances([]string{c.SchemasPath + file.Name()}, nil)[0]
-		// build Value from the Instance
-		schemas = append(schemas, ctx.BuildInstance(buildInstance))
-	}
-
-	return &validator{
-		ctx:     ctx,
+	validator := &validator{
+		context: ctx,
 		schemas: schemas,
 	}
+
+	return validator
 }
 
+/*
+ * Validate the received input.
+ * The payload is matched against the known list of CUE definitions (schemas).
+ * If no schema matches, the validation fails.
+ */
 func (v *validator) Validate(c echo.Context) error {
 	// deserialize input into a Dashboard struct
 	dashboard := new(model.Dashboard)
@@ -64,7 +63,7 @@ func (v *validator) Validate(c echo.Context) error {
 		logrus.Tracef("Panel to validate: %s", string(panelJson))
 
 		// compile the JSON panel into a CUE Value
-		value := v.ctx.CompileBytes(panelJson)
+		value := v.context.CompileBytes(panelJson)
 
 		// iterate over schemas until we find a matching one for our value
 		for _, schema := range v.schemas {
@@ -80,7 +79,7 @@ func (v *validator) Validate(c echo.Context) error {
 
 			err = unified.Validate(opts...)
 			if err != nil {
-				// Validation error, but maybe the next schema will work
+				// validation error, but maybe the next schema will work
 				res = err
 			} else {
 				logrus.Debug("This panel is valid (found matching schema)")
@@ -106,8 +105,37 @@ func (v *validator) Validate(c echo.Context) error {
 }
 
 /*
- * Load schemas from .cue files
+ * Load the known list of schemas into the validator
  */
-func (v *validator) LoadSchemas() {
+func (v *validator) LoadSchemas(path string) {
 	logrus.Info("Loading schemas")
+
+	schemas, err := parseSchemas(v.context, path)
+	if err != nil {
+		logrus.WithError(err).Error("not able to retrieve the list of schema files")
+		return
+	}
+
+	v.schemas = schemas
+}
+
+/*
+ * Retrieve & parse schemas from .cue files
+ */
+func parseSchemas(context *cue.Context, path string) ([]cue.Value, error) {
+	schemas := make([]cue.Value, 0)
+
+	files, err := ioutil.ReadDir(path)
+	if err != nil {
+		return schemas, err
+	}
+
+	for _, file := range files {
+		// Load Cue file into Cue build.Instances slice (the second arg is a configuration object, not used atm)
+		buildInstance := load.Instances([]string{path + file.Name()}, nil)[0]
+		// build Value from the Instance
+		schemas = append(schemas, context.BuildInstance(buildInstance))
+	}
+
+	return schemas, nil
 }
