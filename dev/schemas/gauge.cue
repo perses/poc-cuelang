@@ -1,5 +1,9 @@
-displayed_name: string,
-kind: "GaugeChart",
-chart: {
-  expr: string
+#gaugechart: {
+  displayed_name: string
+  kind: "GaugeChart"
+  chart: {
+    expr: string
+  }
 }
+
+#gaugechart

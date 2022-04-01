@@ -1,10 +1,14 @@
-displayed_name: string,
-kind: "PieChart",
-chart: {
-  queries: [...#query]
+#piechart: {
+  displayed_name: string,
+  kind: "PieChart",
+  chart: {
+    queries: [...#query]
+  }
 }
 
 #query: {
   expr: string
-  legend: string
+  legend?: string
 }
+
+#piechart
