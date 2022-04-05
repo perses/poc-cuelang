@@ -36,7 +36,7 @@ func main() {
 
 	validator := validator.New(conf)
 
-	// watch schemas for changes
+	// watch schemas files for changes
 	watcher.Start(conf, validator)
 
 	serverAPI := api.NewServerAPI(validator)

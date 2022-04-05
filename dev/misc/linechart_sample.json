@@ -1,0 +1,12 @@
+{
+  "displayed_name": "simple line chart",
+  "kind": "LineChart",
+  "chart": {
+      "show_legend": false,
+      "lines": [
+          {
+              "expr": "up"
+          }
+      ]
+  }
+}
