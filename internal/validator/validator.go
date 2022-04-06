@@ -1,7 +1,6 @@
 package validator
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -76,12 +75,10 @@ func (v *validator) Validate(c echo.Context) error {
 	// go through the panels list
 	// the processing stops as soon as it detects an invalid panel TODO: can probably be improved
 	for _, panel := range dashboard.Spec.Panels {
-		// remarshal the panel to be processed by CUE
-		panelJson, _ := json.Marshal(panel)
-		logrus.Tracef("Panel to validate: %s", string(panelJson))
+		logrus.Tracef("Panel to validate: %s", string(panel))
 
 		// compile the JSON panel into a CUE Value
-		value := v.context.CompileBytes(panelJson)
+		value := v.context.CompileBytes(panel)
 
 		// retrieve panel's kind
 		kind, err := value.LookupPath(cue.ParsePath("kind")).String()
@@ -155,8 +152,8 @@ func loadSchemas(context *cue.Context, baseDef cue.Value, path string) (map[stri
 	// for each schema we check that it meets the default specs we expect for any panel, otherwise we dont include it
 	for _, file := range files {
 		schemaPath := fmt.Sprintf("%s/%s", path, file.Name())
-
 		entrypoints := []string{schemaPath, baseDefPath}
+
 		// load Cue files into Cue build.Instances slice (the second arg is a configuration object that we dont need here)
 		buildInstances := load.Instances(entrypoints, nil)
 		// we strongly assume that only 1 buildInstance should be returned (corresponding to the #panel schema), otherwise we skip it
@@ -165,8 +162,8 @@ func loadSchemas(context *cue.Context, baseDef cue.Value, path string) (map[stri
 			logrus.Errorf("The number of build instances for %s is != 1, skipping this schema", file.Name())
 			continue
 		}
-
 		buildInstance := buildInstances[0]
+
 		// check for errors on the instances (these are typically parsing errors)
 		if buildInstance.Err != nil {
 			logrus.WithError(buildInstance.Err).Errorf("Error retrieving schema for %s, skipping this schema", file.Name())
@@ -180,8 +177,8 @@ func loadSchemas(context *cue.Context, baseDef cue.Value, path string) (map[stri
 			continue
 		}
 
+		// check if another schema for the same Kind was already registered
 		kind, _ := schema.LookupPath(cue.ParsePath("kind")).String()
-		// skip if a schema for the same Kind was already registered
 		if _, ok := schemas[kind]; ok {
 			logrus.Errorf("Conflict caused by %s: a schema already exists for kind %s, skipping this schema", file.Name(), kind)
 			continue
