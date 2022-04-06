@@ -74,7 +74,7 @@ func (v *validator) Validate(c echo.Context) error {
 
 	// go through the panels list
 	// the processing stops as soon as it detects an invalid panel TODO: can probably be improved
-	for _, panel := range dashboard.Spec.Panels {
+	for k, panel := range dashboard.Spec.Panels {
 		logrus.Tracef("Panel to validate: %s", string(panel))
 
 		// compile the JSON panel into a CUE Value
@@ -83,7 +83,7 @@ func (v *validator) Validate(c echo.Context) error {
 		// retrieve panel's kind
 		kind, err := value.LookupPath(cue.ParsePath("kind")).String()
 		if err != nil {
-			logrus.WithError(err).Error("This panel doesn't embed the required Kind property")
+			logrus.WithError(err).Error("This panel doesn't contain the required \"kind\" field")
 			break
 		}
 
@@ -92,11 +92,11 @@ func (v *validator) Validate(c echo.Context) error {
 		var ok bool
 		if schema, ok = v.schemas[kind]; !ok {
 			notFound := errors.New("Unknown panel kind")
-			logrus.Errorf("This panel is not valid: unknown kind %s", kind)
+			logrus.Errorf("%s is not valid panel: unknown kind %s", k, kind)
 			res = notFound
 			break
 		}
-		logrus.Tracef("Matching panel against schema: %+v", schema)
+		logrus.Tracef("Matching panel %s against schema: %+v", k, schema)
 
 		// do the validation
 		unified := value.Unify(schema)
@@ -108,7 +108,7 @@ func (v *validator) Validate(c echo.Context) error {
 		}
 		err = unified.Validate(opts...)
 		if err != nil {
-			logrus.WithError(err).Errorf("This panel is not a valid %s", kind)
+			logrus.WithError(err).Errorf("%s is not a valid %s panel", k, kind)
 			res = err
 			break
 		}
