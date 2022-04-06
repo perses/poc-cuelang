@@ -1,7 +1,7 @@
 #panel: {
   displayed_name: string
   kind: string
-  chart: [string]: _ // map of string: <any>
+  chart: _ // any type
 }
 
 #panel
