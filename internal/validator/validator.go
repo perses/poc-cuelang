@@ -152,10 +152,9 @@ func loadSchemas(context *cue.Context, baseDef cue.Value, path string) (map[stri
 	// for each schema we check that it meets the default specs we expect for any panel, otherwise we dont include it
 	for _, file := range files {
 		schemaPath := fmt.Sprintf("%s/%s", path, file.Name())
-		entrypoints := []string{schemaPath, baseDefPath}
 
 		// load Cue files into Cue build.Instances slice (the second arg is a configuration object that we dont need here)
-		buildInstances := load.Instances(entrypoints, nil)
+		buildInstances := load.Instances([]string{}, &load.Config{Dir: schemaPath})
 		// we strongly assume that only 1 buildInstance should be returned (corresponding to the #panel schema), otherwise we skip it
 		// TODO can probably be improved
 		if len(buildInstances) != 1 {
@@ -177,6 +176,12 @@ func loadSchemas(context *cue.Context, baseDef cue.Value, path string) (map[stri
 			continue
 		}
 
+		// unified := schema.Unify(baseDef) // FAIL ! wrong usage of unify, how to merge ?
+		// if unified.Err() != nil {
+		// 	logrus.WithError(unified.Err()).Errorf("Error during schema validation for %s, skipping this schema", file.Name())
+		// 	continue
+		// }
+
 		// check if another schema for the same Kind was already registered
 		kind, _ := schema.LookupPath(cue.ParsePath("kind")).String()
 		if _, ok := schemas[kind]; ok {
@@ -185,7 +190,7 @@ func loadSchemas(context *cue.Context, baseDef cue.Value, path string) (map[stri
 		}
 
 		schemas[kind] = schema
-		logrus.Tracef("Loaded new schema from file %s: %+v", file.Name(), schema)
+		logrus.Debugf("Loaded new schema %s from file %s: %+v", kind, file.Name(), schema)
 	}
 
 	return schemas, nil

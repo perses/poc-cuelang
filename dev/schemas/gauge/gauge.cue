@@ -1,3 +1,5 @@
+package gauge
+
 #gaugechart: {
   displayed_name: string
   kind: "GaugeChart"

@@ -1,3 +1,5 @@
+package pie
+
 #piechart: {
   displayed_name: string,
   kind: "PieChart",
