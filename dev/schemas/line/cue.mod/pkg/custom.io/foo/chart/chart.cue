@@ -1,4 +1,4 @@
-package line
+package chart
 
 #chart: {
   show_legend?: bool
