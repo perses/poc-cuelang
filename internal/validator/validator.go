@@ -71,7 +71,8 @@ func (v *validator) Validate(c echo.Context) error {
 		// retrieve panel's kind
 		kind, err := value.LookupPath(cue.ParsePath("kind")).String()
 		if err != nil {
-			logrus.WithError(err).Error("This panel doesn't contain the required \"kind\" field")
+			logrus.Error("This panel doesn't contain the required \"kind\" field")
+			res = err
 			break
 		}
 
@@ -79,9 +80,8 @@ func (v *validator) Validate(c echo.Context) error {
 		var schema cue.Value
 		var ok bool
 		if schema, ok = v.schemas[kind]; !ok {
-			notFound := errors.New("Unknown panel kind")
 			logrus.Errorf("%s is not valid panel: unknown kind %s", k, kind)
-			res = notFound
+			res = errors.New("Unknown panel kind")
 			break
 		}
 		logrus.Tracef("Matching panel %s against schema: %+v", k, schema)
@@ -96,7 +96,7 @@ func (v *validator) Validate(c echo.Context) error {
 		}
 		err = unified.Validate(opts...)
 		if err != nil {
-			logrus.WithError(err).Errorf("%s is not a valid %s panel", k, kind)
+			logrus.Errorf("%s is not a valid %s panel", k, kind)
 			res = err
 			break
 		}
@@ -105,7 +105,7 @@ func (v *validator) Validate(c echo.Context) error {
 	if res == nil {
 		logrus.Info("This dashboard is OK, all its panels are valid")
 	} else {
-		logrus.WithError(err).Error("This dashboard is KO, at least 1 panel is invalid")
+		logrus.WithError(res).Error("This dashboard is KO, at least 1 panel is invalid")
 	}
 
 	return res
@@ -171,7 +171,7 @@ func loadSchemas(context *cue.Context, path string) (map[string]cue.Value, error
 		}
 
 		schemas[kind] = schema
-		logrus.Debugf("Loaded new schema %s from file %s: %+v", kind, schemaPath, schema)
+		logrus.Debugf("Loaded schema %s from file %s: %+v", kind, schemaPath, schema)
 	}
 
 	return schemas, nil

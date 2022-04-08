@@ -29,7 +29,8 @@ func Start(c *config.Config, v validator.Validator) {
 				case event, ok := <-watcher.Events:
 					if !ok {
 						return
-					} else {
+					}
+					if event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Remove == fsnotify.Remove {
 						logrus.Tracef("%s event on %s", event.Op, event.Name)
 						v.LoadSchemas(c.SchemasPath)
 					}
