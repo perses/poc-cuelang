@@ -149,48 +149,49 @@ func loadSchemas(context *cue.Context, baseDef cue.Value, path string) (map[stri
 	}
 
 	// process each .cue file to convert it into a CUE Value
-	// for each schema we check that it meets the default specs we expect for any panel, otherwise we dont include it
 	for _, file := range files {
 		schemaPath := fmt.Sprintf("%s/%s", path, file.Name())
 
-		// load Cue files into Cue build.Instances slice (the second arg is a configuration object that we dont need here)
+		// load Cue files into Cue build.Instances slice
 		buildInstances := load.Instances([]string{}, &load.Config{Dir: schemaPath})
 		// we strongly assume that only 1 buildInstance should be returned (corresponding to the #panel schema), otherwise we skip it
 		// TODO can probably be improved
 		if len(buildInstances) != 1 {
-			logrus.Errorf("The number of build instances for %s is != 1, skipping this schema", file.Name())
+			logrus.Errorf("The number of build instances for %s is != 1, skipping this schema", schemaPath)
 			continue
 		}
 		buildInstance := buildInstances[0]
 
 		// check for errors on the instances (these are typically parsing errors)
 		if buildInstance.Err != nil {
-			logrus.WithError(buildInstance.Err).Errorf("Error retrieving schema for %s, skipping this schema", file.Name())
+			logrus.WithError(buildInstance.Err).Errorf("Error retrieving schema for %s, skipping this schema", schemaPath)
 			continue
 		}
 
 		// build Value from the Instance
 		schema := context.BuildInstance(buildInstance)
 		if schema.Err() != nil {
-			logrus.WithError(schema.Err()).Errorf("Error during build for %s, skipping this schema", file.Name())
+			logrus.WithError(schema.Err()).Errorf("Error during build for %s, skipping this schema", schemaPath)
 			continue
 		}
 
-		// unified := schema.Unify(baseDef) // FAIL ! wrong usage of unify, how to merge ?
-		// if unified.Err() != nil {
-		// 	logrus.WithError(unified.Err()).Errorf("Error during schema validation for %s, skipping this schema", file.Name())
-		// 	continue
-		// }
+		// check that the schema meets the default specs we expect for any panel
+		logrus.Infof("unify schema :\n%+v\nwith baseDef:\n%+v", schema, baseDef)
+		unified := schema.Unify(baseDef)
+		if unified.Err() != nil {
+			logrus.WithError(unified.Err()).Errorf("Error during schema validation (unify) for %s, skipping this schema", schemaPath)
+			continue
+		}
 
 		// check if another schema for the same Kind was already registered
 		kind, _ := schema.LookupPath(cue.ParsePath("kind")).String()
 		if _, ok := schemas[kind]; ok {
-			logrus.Errorf("Conflict caused by %s: a schema already exists for kind %s, skipping this schema", file.Name(), kind)
+			logrus.Errorf("Conflict caused by %s: a schema already exists for kind %s, skipping this schema", schemaPath, kind)
 			continue
 		}
 
 		schemas[kind] = schema
-		logrus.Debugf("Loaded new schema %s from file %s: %+v", kind, file.Name(), schema)
+		logrus.Debugf("Loaded new schema %s from file %s: %+v", kind, schemaPath, schema)
 	}
 
 	return schemas, nil

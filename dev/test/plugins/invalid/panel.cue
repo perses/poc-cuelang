@@ -1,8 +1,7 @@
 package gauge
 
 #panel: {
-  displayed_name: string
-  kind: "GaugeChart"
+  kind: "InvalidChart"
   chart: {
     expr: string
   }

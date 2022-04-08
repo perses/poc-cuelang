@@ -1,6 +1,6 @@
 package pie
 
-#piechart: {
+#panel: {
   displayed_name: string,
   kind: "PieChart",
   chart: {
@@ -8,4 +8,4 @@ package pie
   }
 }
 
-#piechart
+#panel

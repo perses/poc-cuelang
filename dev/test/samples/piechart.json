@@ -1,0 +1,12 @@
+{
+  "displayed_name": "simple pie chart",
+  "kind": "PieChart",
+  "chart": {
+    "queries": [
+      {
+        "expr": "up",
+        "legend": "the up metric"
+      }
+    ]
+  }
+}
