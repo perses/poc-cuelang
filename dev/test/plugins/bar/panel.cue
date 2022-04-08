@@ -1,4 +1,4 @@
-package pie
+package bar
 
 #panel: {
   displayed_name: string,
