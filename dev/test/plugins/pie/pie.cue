@@ -1,4 +1,6 @@
-#piechart: {
+package pie
+
+#panel: {
   displayed_name: string,
   kind: "PieChart",
   chart: {
@@ -6,9 +8,4 @@
   }
 }
 
-#query: {
-  expr: string
-  legend?: string
-}
-
-#piechart
+#panel

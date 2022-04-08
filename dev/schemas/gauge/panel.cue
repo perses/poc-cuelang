@@ -1,4 +1,6 @@
-#gaugechart: {
+package gauge
+
+#panel: {
   displayed_name: string
   kind: "GaugeChart"
   chart: {
@@ -6,4 +8,4 @@
   }
 }
 
-#gaugechart
+#panel
