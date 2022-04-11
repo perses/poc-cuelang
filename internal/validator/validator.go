@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
@@ -14,6 +15,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const baseDefPath = "cue/base.cue"
+
 type Validator interface {
 	Validate(c echo.Context) error
 	LoadSchemas(path string)
@@ -21,6 +24,7 @@ type Validator interface {
 
 type validator struct {
 	context *cue.Context
+	baseDef cue.Value
 	schemas map[string]cue.Value
 }
 
@@ -30,13 +34,21 @@ type validator struct {
 func New(c *config.Config) Validator {
 	ctx := cuecontext.New()
 
-	schemas, err := loadSchemas(ctx, c.SchemasPath)
+	// load the base panel definition
+	data, err := os.ReadFile(baseDefPath)
+	if err != nil {
+		logrus.WithError(err).Fatalf("Not able to read the base panel definition file %s, shutting down..", baseDefPath)
+	}
+	baseDef := ctx.CompileBytes(data)
+
+	schemas, err := loadSchemas(ctx, baseDef, c.SchemasPath)
 	if err != nil {
 		logrus.WithError(err).Error("Not able to retrieve the list of schema files")
 	}
 
 	validator := &validator{
 		context: ctx,
+		baseDef: baseDef,
 		schemas: schemas,
 	}
 
@@ -115,7 +127,7 @@ func (v *validator) Validate(c echo.Context) error {
  * Load the known list of schemas into the validator
  */
 func (v *validator) LoadSchemas(path string) {
-	schemas, err := loadSchemas(v.context, path)
+	schemas, err := loadSchemas(v.context, v.baseDef, path)
 	if err != nil {
 		logrus.WithError(err).Error("Not able to retrieve the list of schema files")
 		return
@@ -128,7 +140,7 @@ func (v *validator) LoadSchemas(path string) {
 /*
  * Load & return the known list of schemas
  */
-func loadSchemas(context *cue.Context, path string) (map[string]cue.Value, error) {
+func loadSchemas(context *cue.Context, baseDef cue.Value, path string) (map[string]cue.Value, error) {
 	schemas := map[string]cue.Value{}
 
 	files, err := ioutil.ReadDir(path)
@@ -137,12 +149,13 @@ func loadSchemas(context *cue.Context, path string) (map[string]cue.Value, error
 	}
 
 	// process each .cue file to convert it into a CUE Value
+	// for each schema we check that it meets the default specs we expect for any panel, otherwise we dont include it
 	for _, file := range files {
 		schemaPath := fmt.Sprintf("%s/%s", path, file.Name())
 
-		// load Cue files into Cue build.Instances slice
+		// load the cue files into build.Instances slice
 		buildInstances := load.Instances([]string{}, &load.Config{Dir: schemaPath})
-		// we strongly assume that only 1 buildInstance should be returned (corresponding to the #panel schema), otherwise we skip it
+		// we strongly assume that only 1 buildInstance should be returned (corresponding to the main definition like #panel), otherwise we skip it
 		// TODO can probably be improved
 		if len(buildInstances) != 1 {
 			logrus.Errorf("The number of build instances for %s is != 1, skipping this schema", schemaPath)
@@ -160,6 +173,13 @@ func loadSchemas(context *cue.Context, path string) (map[string]cue.Value, error
 		schema := context.BuildInstance(buildInstance)
 		if schema.Err() != nil {
 			logrus.WithError(schema.Err()).Errorf("Error during build for %s, skipping this schema", schemaPath)
+			continue
+		}
+
+		// check if the schema fulfils the base panel requirements
+		unified := baseDef.Unify(schema)
+		if unified.Err() != nil {
+			logrus.WithError(unified.Err()).Errorf("Error during schema validation for %s, skipping this schema", schemaPath)
 			continue
 		}
 
