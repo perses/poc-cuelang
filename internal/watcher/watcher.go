@@ -9,7 +9,7 @@ import (
 
 /*
  * Start watching for changes in the schemas folder.
- * Whenever a change is detected (write, creat, delete..), we
+ * Whenever a change is detected (write & delete), we
  * notify the validator to refresh its list of schemas.
  */
 func Start(c *config.Config, v validator.Validator) {
